@@ -1,6 +1,6 @@
 # Star Wars Fleet Directory
 
-A single-page Angular application displaying Star Wars starship data from the [SWAPI](https://swapi.info/) API in a feature-rich data grid.
+A single-page Angular application displaying Star Wars starship data from the [SWAPI](https://swapi.dev/) API in a feature-rich data grid.
 
 ## Installation & Running
 
@@ -21,9 +21,9 @@ yarn build
 
 ## SWAPI Resource
 
-**Starships** — `https://swapi.info/api/starships`
+**Starships** — `https://swapi.dev/api/starships`
 
-The `swapi.info` mirror is used instead of the now-offline `swapi.dev`. This endpoint returns the full starship array in one request.
+This endpoint returns the full starship array in one request.
 
 ## Features
 
@@ -71,7 +71,6 @@ A debounced (300 ms) text input filters starships by **name or model** against t
 
 ## Trade-offs & Limitations
 
-- **Full-array fetch on load:** `swapi.info` returns the complete starship list (~36 items) in one request. This avoids SWAPI's server-side pagination entirely, which means infinite scroll is purely client-side after the first load. For a much larger dataset a real cursor/page-based API would be needed.
 - **No column sorting:** TanStack Table's `getSortedRowModel` was intentionally excluded to keep scope focused on the stated requirements.
 - **No column visibility toggle:** All 13 columns are always shown; horizontal scroll handles narrow viewports.
 - **Edit persistence:** Edits survive search/navigation within the session but are lost on page refresh, as intended by the requirement (client state only).

@@ -32,7 +32,7 @@ describe('DataGridComponent', () => {
         hyperdrive_rating: '0.5',
         MGLT: '75',
         starship_class: 'Light freighter',
-        url: 'https://swapi.info/api/starships/10/'
+        url: 'https://swapi.dev/api/starships/10/'
       }
     ]
   };

@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of, throwError } from 'rxjs';
-import { catchError, map, tap } from 'rxjs/operators';
+import { catchError, tap } from 'rxjs/operators';
 
 export interface Starship {
   name: string;
@@ -32,23 +32,36 @@ export interface SwapiResponse {
 })
 export class SwapiService {
   private http = inject(HttpClient);
-  private baseUrl = 'https://swapi.info/api/starships';
+  private readonly baseUrl = 'https://swapi.dev/api/starships/';
 
-  // Cache the full array of starships once fetched from swapi.info
-  private allStarships: Starship[] | null = null;
+  /** In-memory cache: key = "<page>:<search>" → cached response */
+  private cache = new Map<string, SwapiResponse>();
 
+  private cacheKey(page: number, search: string): string {
+    return `${page}:${search.trim()}`;
+  }
+
+  /**
+   * Fetches a page of starships from the real SWAPI API.
+   * Both `page` and `search` are forwarded as native API query params
+   * so pagination and filtering happen server-side.
+   *
+   * Results are cached in memory so the same page is never re-fetched.
+   */
   getStarships(page: number = 1, search: string = ''): Observable<SwapiResponse> {
-    if (this.allStarships) {
-      return of(this.processLocalData(this.allStarships, page, search));
+    const key = this.cacheKey(page, search);
+    const cached = this.cache.get(key);
+    if (cached) {
+      return of(cached);
     }
 
-    return this.http.get<Starship[]>(this.baseUrl).pipe(
-      tap(data => {
-        this.allStarships = data;
-      }),
-      map(data => {
-        return this.processLocalData(data, page, search);
-      }),
+    let params = new HttpParams().set('page', page.toString());
+    if (search.trim()) {
+      params = params.set('search', search.trim());
+    }
+
+    return this.http.get<SwapiResponse>(this.baseUrl, { params }).pipe(
+      tap(response => this.cache.set(key, response)),
       catchError(error => {
         console.error('SWAPI fetch error:', error);
         return throwError(() => new Error(error.message || 'Failed to fetch starships from Star Wars API.'));
@@ -57,39 +70,18 @@ export class SwapiService {
   }
 
   /**
-   * Helper to perform client-side filtering and pagination matching SwapiResponse structure
+   * Evicts cached entries for a given search query (or all entries if no
+   * search is provided).  Call this when the user changes the search term
+   * so stale results don't leak across queries.
    */
-  private processLocalData(starships: Starship[], page: number, search: string): SwapiResponse {
-    let filtered = starships;
-    if (search.trim()) {
-      const query = search.toLowerCase().trim();
-      filtered = starships.filter(ship => 
-        ship.name.toLowerCase().includes(query) || 
-        ship.model.toLowerCase().includes(query)
-      );
+  clearCache(search?: string): void {
+    if (search === undefined) {
+      this.cache.clear();
+    } else {
+      const suffix = `:${search.trim()}`;
+      for (const key of this.cache.keys()) {
+        if (key.endsWith(suffix)) this.cache.delete(key);
+      }
     }
-
-    const pageSize = 10;
-    const startIndex = (page - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    const sliced = filtered.slice(startIndex, endIndex);
-
-    const hasNext = endIndex < filtered.length;
-    const nextUrl = hasNext ? `mock-next-page?page=${page + 1}` : null;
-    const prevUrl = page > 1 ? `mock-prev-page?page=${page - 1}` : null;
-
-    return {
-      count: filtered.length,
-      next: nextUrl,
-      previous: prevUrl,
-      results: sliced
-    };
-  }
-
-  /**
-   * Helper to clear cache if needed
-   */
-  clearCache(): void {
-    this.allStarships = null;
   }
 }

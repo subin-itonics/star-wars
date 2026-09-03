@@ -23,7 +23,7 @@ describe('SwapiService', () => {
       hyperdrive_rating: '2.0',
       MGLT: '60',
       starship_class: 'corvette',
-      url: 'https://swapi.info/api/starships/2/'
+      url: 'https://swapi.dev/api/starships/2/'
     },
     {
       name: 'Death Star',
@@ -39,7 +39,7 @@ describe('SwapiService', () => {
       hyperdrive_rating: '4.0',
       MGLT: '10',
       starship_class: 'Deep Space Mobile Battlestation',
-      url: 'https://swapi.info/api/starships/9/'
+      url: 'https://swapi.dev/api/starships/9/'
     }
   ];
 
@@ -71,7 +71,7 @@ describe('SwapiService', () => {
       expect(data.next).toBeNull();
     });
 
-    const req = httpMock.expectOne('https://swapi.info/api/starships');
+    const req = httpMock.expectOne('https://swapi.dev/api/starships');
     expect(req.request.method).toBe('GET');
     req.flush(mockStarships);
   });
@@ -83,14 +83,14 @@ describe('SwapiService', () => {
       expect(data.results[0].name).toBe('Death Star');
     });
 
-    const req = httpMock.expectOne('https://swapi.info/api/starships');
+    const req = httpMock.expectOne('https://swapi.dev/api/starships');
     req.flush(mockStarships);
   });
 
   it('should cache consecutive requests for same page/query', () => {
     // First call - triggers HTTP
     service.getStarships(1).subscribe();
-    const req = httpMock.expectOne('https://swapi.info/api/starships');
+    const req = httpMock.expectOne('https://swapi.dev/api/starships');
     req.flush(mockStarships);
 
     // Second call - should return cached value synchronously, no HTTP request made

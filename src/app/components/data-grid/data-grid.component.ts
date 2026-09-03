@@ -55,6 +55,9 @@ export class DataGridComponent implements OnInit, AfterViewInit, OnDestroy {
   isBackgroundLoading = signal<boolean>(false);
   errorMessage = signal<string | null>(null);
 
+  /** Atomic guard — set to true as the very first thing in fetchNextPage. */
+  private isFetching = false;
+
   // Cell editing
   editingCell = signal<{ url: string; columnId: keyof Starship } | null>(null);
   editValue = signal<string>('');
@@ -288,7 +291,9 @@ export class DataGridComponent implements OnInit, AfterViewInit, OnDestroy {
   // ── Data fetching ────────────────────────────────────────────────────────────
 
   fetchNextPage(): void {
-    if ((this.isBackgroundLoading() || !this.hasNextPage()) && !this.isInitialLoading()) return;
+    // Atomic guard: prevent concurrent fetches or fetching past the last page.
+    if (this.isFetching || !this.hasNextPage()) return;
+    this.isFetching = true;
 
     this.starships().length === 0
       ? this.isInitialLoading.set(true)
@@ -296,6 +301,7 @@ export class DataGridComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.errorMessage.set(null);
 
+    const wasInitialLoading = this.isInitialLoading();
     this.swapiService.getStarships(this.currentPage(), this.searchQuery()).subscribe({
       next: (response) => {
         const fresh = response.results.filter(
@@ -306,16 +312,30 @@ export class DataGridComponent implements OnInit, AfterViewInit, OnDestroy {
         if (response.next) this.currentPage.update(p => p + 1);
         this.isInitialLoading.set(false);
         this.isBackgroundLoading.set(false);
+        this.isFetching = false;
+        // On the very first load the scrollAnchor element doesn't exist in the
+        // DOM yet (it's inside @if (!isInitialLoading())).  The observer set up
+        // in ngAfterViewInit therefore never attaches.  Re-attach it after
+        // Angular has had a tick to render the now-visible table.
+        if (wasInitialLoading) {
+          setTimeout(() => this.setupIntersectionObserver(), 0);
+        }
       },
       error: (err) => {
         this.errorMessage.set(err.message || 'Error loading data.');
         this.isInitialLoading.set(false);
         this.isBackgroundLoading.set(false);
+        this.isFetching = false;
       }
     });
   }
 
   resetGridForNewSearch(): void {
+    // Evict cached pages for the current (outgoing) search so a fresh query
+    // always hits the network, while pages for the *new* query can still be
+    // served from cache if the user reverts to a previous term.
+    this.swapiService.clearCache(this.searchQuery());
+    this.isFetching = false;
     this.starships.set([]);
     this.currentPage.set(1);
     this.hasNextPage.set(true);
@@ -337,11 +357,9 @@ export class DataGridComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       { root: null, rootMargin: '200px', threshold: 0.1 }
     );
-    setTimeout(() => {
-      if (this.scrollAnchor?.nativeElement) {
-        this.observer?.observe(this.scrollAnchor.nativeElement);
-      }
-    }, 100);
+    if (this.scrollAnchor?.nativeElement) {
+      this.observer.observe(this.scrollAnchor.nativeElement);
+    }
   }
 
   // ── Row selection ────────────────────────────────────────────────────────────
